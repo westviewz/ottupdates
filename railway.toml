@@ -1,0 +1,28 @@
+# railway.toml — Railway project configuration
+#
+# This file tells Railway how to build and run the bot.
+# The cron schedule is configured here OR in the Railway dashboard.
+#
+# For a Railway Cron Job service, set the schedule in the dashboard under:
+#   Service → Settings → Cron Schedule
+#
+# To run at 08:30 IST (03:00 UTC):
+#   Cron expression: 0 3 * * *
+#
+# IST is UTC+5:30, so subtract 5h30m from your desired IST time:
+#   Desired IST time   →   UTC cron expression
+#   06:00 IST          →   0 0 * * *   (00:30 UTC)  ← use 0 0 * * *
+#   07:30 IST          →   0 2 * * *   (02:00 UTC)
+#   08:30 IST          →   0 3 * * *   (03:00 UTC)  ← recommended
+#   10:00 IST          →   30 4 * * *  (04:30 UTC)
+#   12:00 IST          →   30 6 * * *  (06:30 UTC)
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# For a Cron Job service in Railway, set startCommand here.
+# Railway will execute this once per cron trigger.
+startCommand = "python -m app.main"
+restartPolicyType = "NEVER"
