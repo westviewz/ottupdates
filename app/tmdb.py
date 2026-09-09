@@ -37,18 +37,37 @@ class TMDBClient:
     """
     Thin wrapper around the TMDB REST API.
 
-    Authentication uses the Bearer token (API Read Access Token) via the
-    Authorization header, which is the recommended approach for v3 endpoints.
+    Supports two TMDB credential formats automatically:
+
+    1. API Read Access Token (Bearer JWT) — long token starting with "eyJ".
+       Sent as:  Authorization: Bearer <token>
+       Obtain from: https://www.themoviedb.org/settings/api  (the long token)
+
+    2. API Key v3 — short 32-character alphanumeric string.
+       Sent as:  ?api_key=<key>  query parameter.
+       Obtain from: https://www.themoviedb.org/settings/api  (the short key)
+
+    Either value can be placed in TMDB_API_KEY — the client detects which
+    format was provided and uses the correct authentication method.
     """
 
     def __init__(self, api_key: str, region: str = "IN") -> None:
         """
         Args:
-            api_key: TMDB API Read Access Token (Bearer token).
+            api_key: Either the TMDB Bearer token (starts with 'eyJ') or
+                     the short v3 API Key (32-char alphanumeric string).
             region:  ISO 3166-1 alpha-2 country code for watch-region filtering.
         """
         self.api_key = api_key
         self.region = region
+        # Detect auth mode so both credential types work without user changes
+        self._use_bearer = api_key.startswith("eyJ")
+        logger.info(
+            "TMDB auth mode: %s",
+            "Bearer token (API Read Access Token)"
+            if self._use_bearer
+            else "API Key v3 (query parameter)",
+        )
         self._session = self._build_session()
 
     # ------------------------------------------------------------------
@@ -240,21 +259,33 @@ class TMDBClient:
         """
         Perform a GET request against the TMDB API.
 
+        Auth is applied automatically based on the credential type detected
+        at construction time:
+          - Bearer JWT  → Authorization: Bearer <token> header
+          - API Key v3  → ?api_key=<key> query parameter
+
         Handles 429 rate-limiting with a backoff wait.
         Raises TMDBError for non-recoverable HTTP errors.
         """
         url = f"{TMDB_BASE_URL}{endpoint}"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Accept": "application/json",
-        }
+
+        if self._use_bearer:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Accept": "application/json",
+            }
+            request_params = params
+        else:
+            headers = {"Accept": "application/json"}
+            # Merge api_key into a copy of params (don't mutate caller's dict)
+            request_params = {**params, "api_key": self.api_key}
 
         for attempt in range(3):
             try:
                 response = self._session.get(
                     url,
                     headers=headers,
-                    params=params,
+                    params=request_params,
                     timeout=REQUEST_TIMEOUT,
                 )
 
