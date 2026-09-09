@@ -171,12 +171,11 @@ def _workflow(
             confident_releases.append(release)
         else:
             skipped_low_confidence += 1
-            logger.info(
-                "Skipping [%s] %s — confidence=%s (below threshold %s) | %s",
+            logger.debug(
+                "Skipping [%s] %s — confidence=%s | %s",
                 release.media_type,
                 release.title,
                 release.confidence.name,
-                threshold.name,
                 release.date_note,
             )
 

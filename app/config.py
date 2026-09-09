@@ -46,7 +46,11 @@ class Config:
     ])
 
     # --- Date window ---
-    lookback_days: int = 1
+    # lookback_days: how many days BEFORE today to include in the confidence window.
+    # 7 days is a good default — OTT titles often appear in TMDB watch-provider
+    # data a few days after their actual release date, and the narrow window needs
+    # to be wide enough to catch them. MongoDB dedup prevents re-posting.
+    lookback_days: int = 7
     lookahead_days: int = 1
 
     # How many days back to search TMDB for candidate titles.
