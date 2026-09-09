@@ -1,46 +1,12 @@
 # railway.toml — Railway project configuration
-#
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# HOW TO CHANGE THE POSTING TIME
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#
-# Railway cron expressions use UTC time.
-# India Standard Time (IST) = UTC + 5:30
-# Subtract 5 hours 30 minutes from your desired IST time to get UTC.
-#
-# Common IST → UTC conversions:
-# ┌─────────────┬────────────┬────────────────────────┐
-# │  IST time   │  UTC time  │  Cron expression (UTC) │
-# ├─────────────┼────────────┼────────────────────────┤
-# │  06:00 IST  │  00:30 UTC │  30 0 * * *            │
-# │  07:00 IST  │  01:30 UTC │  30 1 * * *            │
-# │  07:30 IST  │  02:00 UTC │  0 2 * * *             │
-# │  08:00 IST  │  02:30 UTC │  30 2 * * *            │
-# │  08:30 IST  │  03:00 UTC │  0 3 * * *   ← default │
-# │  09:00 IST  │  03:30 UTC │  30 3 * * *            │
-# │  09:30 IST  │  04:00 UTC │  0 4 * * *             │
-# │  10:00 IST  │  04:30 UTC │  30 4 * * *            │
-# │  11:00 IST  │  05:30 UTC │  30 5 * * *            │
-# │  12:00 IST  │  06:30 UTC │  30 6 * * *            │
-# │  18:00 IST  │  12:30 UTC │  30 12 * * *           │
-# │  20:00 IST  │  14:30 UTC │  30 14 * * *           │
-# └─────────────┴────────────┴────────────────────────┘
-#
-# To change the schedule:
-#   1. Find your desired IST time in the table above.
-#   2. Copy the corresponding cron expression.
-#   3. In the Railway dashboard → Cron Job service → Settings → Schedule,
-#      paste the new cron expression and save.
-#   OR update the `cronSchedule` field below if you manage config via this file.
-#
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Command executed by Railway on each cron trigger.
-# Do NOT change this — change the schedule in Railway dashboard instead.
+# Standard start command. The bot now runs continuously (as a daemon)
+# and manages its own schedule internally using APScheduler.
+# Make sure you deploy this as a standard "Service" in Railway,
+# NOT as a "Cron Job" service.
 startCommand = "python -m app.main"
-restartPolicyType = "NEVER"
+restartPolicyType = "ON_FAILURE"

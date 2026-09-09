@@ -264,15 +264,50 @@ def _workflow(
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Entry point / Scheduler
 # ---------------------------------------------------------------------------
 
 
 def main() -> None:
-    """Entry point for `python -m app.main`."""
-    exit_code = run()
-    logger.info("Exiting with code %d.", exit_code)
-    sys.exit(exit_code)
+    """Entry point for the bot process."""
+    # Load config early so we can read schedule settings
+    try:
+        from app.config import Config
+        config = Config.load()
+    except Exception as exc:
+        logger.critical("Failed to load config at startup: %s", exc)
+        sys.exit(1)
+
+    if config.run_on_startup:
+        logger.info("RUN_ON_STARTUP is true — executing immediate run...")
+        run()
+
+    try:
+        from apscheduler.schedulers.blocking import BlockingScheduler
+        import pytz
+    except ImportError:
+        logger.critical("apscheduler or pytz missing. Did you install requirements?")
+        sys.exit(1)
+
+    try:
+        hour, minute = map(int, config.run_at_time.split(':'))
+    except ValueError:
+        logger.error("Invalid RUN_AT_TIME format %r. Defaulting to 08:30.", config.run_at_time)
+        hour, minute = 8, 30
+
+    ist = pytz.timezone("Asia/Kolkata")
+    scheduler = BlockingScheduler(timezone=ist)
+    
+    # Schedule the daily run
+    scheduler.add_job(run, 'cron', hour=hour, minute=minute)
+    
+    logger.info("Scheduler started! The bot will run daily at %02d:%02d IST.", hour, minute)
+    logger.info("Leave this process running.")
+    
+    try:
+        scheduler.start()
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Scheduler stopped. Exiting.")
 
 
 if __name__ == "__main__":

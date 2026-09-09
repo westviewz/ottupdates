@@ -63,6 +63,13 @@ class Config:
     # --- Behaviour ---
     post_empty_update: bool = False
 
+    # --- Schedule ---
+    # The IST time to run the daily update (HH:MM format).
+    run_at_time: str = "08:30"
+    # If True, the bot will run the update immediately when it starts up,
+    # before settling into its daily schedule. Useful for container restarts.
+    run_on_startup: bool = False
+
     # --- Release confidence threshold ---
     # Minimum DateConfidence level required to include a title in the post.
     # Valid values: CONFIRMED_DATE, APPROXIMATE_DATE, UNKNOWN_DATE
@@ -129,6 +136,15 @@ class Config:
         # Empty-update flag
         post_empty_update = optional("POST_EMPTY_UPDATE", "false").lower() == "true"
 
+        # Schedule
+        run_at_time = optional("RUN_AT_TIME", "08:30").strip()
+        # Basic validation for HH:MM
+        if len(run_at_time.split(":")) != 2:
+            logger.warning("Invalid RUN_AT_TIME %r. Expected HH:MM. Defaulting to 08:30.", run_at_time)
+            run_at_time = "08:30"
+        
+        run_on_startup = optional("RUN_ON_STARTUP", "false").lower() == "true"
+
         # Release confidence threshold — validate against known values
         _valid_confidence = {"CONFIRMED_DATE", "APPROXIMATE_DATE", "UNKNOWN_DATE"}
         min_release_confidence = optional(
@@ -156,6 +172,8 @@ class Config:
             lookahead_days=lookahead_days,
             discover_lookback_days=discover_lookback_days,
             post_empty_update=post_empty_update,
+            run_at_time=run_at_time,
+            run_on_startup=run_on_startup,
             min_release_confidence=min_release_confidence,
         )
 
