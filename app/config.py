@@ -49,6 +49,13 @@ class Config:
     lookback_days: int = 1
     lookahead_days: int = 1
 
+    # How many days back to search TMDB for candidate titles.
+    # This is WIDER than lookback_days — it covers titles released in the
+    # past N days that are currently on the configured platforms.
+    # The narrow confidence window (lookback_days/lookahead_days) then
+    # decides which of those candidates are actually "new" enough to post.
+    discover_lookback_days: int = 90
+
     # --- Behaviour ---
     post_empty_update: bool = False
 
@@ -101,16 +108,19 @@ class Config:
         )
         ott_providers = [p.strip() for p in raw_providers.split(",") if p.strip()]
 
-        # Date window
+        # Date windows
         try:
             lookback_days = int(optional("LOOKBACK_DAYS", "1"))
             lookahead_days = int(optional("LOOKAHEAD_DAYS", "1"))
+            discover_lookback_days = int(optional("DISCOVER_LOOKBACK_DAYS", "90"))
         except ValueError:
             logger.warning(
-                "Invalid LOOKBACK_DAYS or LOOKAHEAD_DAYS; defaulting to 1/1."
+                "Invalid LOOKBACK_DAYS, LOOKAHEAD_DAYS, or DISCOVER_LOOKBACK_DAYS; "
+                "defaulting to 1/1/90."
             )
             lookback_days = 1
             lookahead_days = 1
+            discover_lookback_days = 90
 
         # Empty-update flag
         post_empty_update = optional("POST_EMPTY_UPDATE", "false").lower() == "true"
@@ -140,6 +150,7 @@ class Config:
             ott_providers=ott_providers,
             lookback_days=lookback_days,
             lookahead_days=lookahead_days,
+            discover_lookback_days=discover_lookback_days,
             post_empty_update=post_empty_update,
             min_release_confidence=min_release_confidence,
         )

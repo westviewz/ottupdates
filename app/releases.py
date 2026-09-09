@@ -67,7 +67,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -236,11 +236,35 @@ class TMDBSource(Source):
         """
         Fetch and return filtered releases within the given date window.
 
+        TWO-WINDOW STRATEGY
+        -------------------
+        TMDB's primary_release_date is the theatrical/broadcast premiere.
+        Combining a narrow date filter with a watch-provider filter in the
+        discover query almost always returns 0 results because:
+          - OTT availability happens weeks or months after theatrical release.
+          - Very few titles have primary_release_date == OTT-addition date.
+
+        To work around this, we use two separate windows:
+
+        1. DISCOVER WINDOW (wide) — used in the TMDB /discover query.
+           Spans `discover_lookback_days` days back from window.end (default 90).
+           This returns all titles released in roughly the last 3 months that
+           are currently on the configured platforms in India. Sorted by
+           primary_release_date.desc so recently released titles come first.
+
+        2. CONFIDENCE WINDOW (narrow) — used in _classify_confidence().
+           This is the `window` argument passed in (today ± LOOKBACK/LOOKAHEAD).
+           A title must have a date (digital or primary/air) within THIS window
+           to receive CONFIRMED_DATE or APPROXIMATE_DATE confidence.
+
+        Titles whose dates fall outside the confidence window are classified
+        UNKNOWN_DATE and are filtered out by the MIN_RELEASE_CONFIDENCE threshold.
+
         Returns an empty list if TMDB is unreachable or returns no results.
         All returned releases have a DateConfidence value. The caller is
         responsible for applying the MIN_RELEASE_CONFIDENCE threshold.
         """
-        logger.info("TMDB fetch — window: %s", window)
+        logger.info("Confidence window (narrow): %s", window)
 
         # Step 1: Resolve provider IDs
         provider_ids = self._resolve_provider_ids()
@@ -257,19 +281,33 @@ class TMDBSource(Source):
                 "Resolved %d provider IDs: %s", len(provider_ids), provider_id_str
             )
 
-        date_gte = window.start.isoformat()
-        date_lte = window.end.isoformat()
+        # Step 2: Compute wide discover window
+        # Use discover_lookback_days from config (default 90) to scan a large
+        # enough pool of recent titles currently on the configured platforms.
+        discover_lookback = getattr(self.config, "discover_lookback_days", 90)
+        discover_start = window.end - timedelta(days=discover_lookback)
+        discover_end = window.end  # don't look ahead for discover; confidence handles it
+
+        logger.info(
+            "TMDB discover window (wide): %s → %s (%d-day lookback)",
+            discover_start,
+            discover_end,
+            discover_lookback,
+        )
+
+        discover_gte = discover_start.isoformat()
+        discover_lte = discover_end.isoformat()
 
         releases: List[Release] = []
         seen_combinations: set[tuple] = set()  # (tmdb_id, media_type, provider)
 
-        # Step 2a: Discover movies
+        # Step 3a: Discover movies
         movies_found = 0
         try:
             for item in self.client.discover_movies(
                 with_watch_providers=provider_id_str,
-                date_gte=date_gte,
-                date_lte=date_lte,
+                date_gte=discover_gte,
+                date_lte=discover_lte,
             ):
                 movies_found += 1
                 release = self._process_item(item, "movie", seen_combinations, window)
@@ -280,13 +318,13 @@ class TMDBSource(Source):
 
         logger.info("TMDB movies scanned: %d", movies_found)
 
-        # Step 2b: Discover TV shows
+        # Step 3b: Discover TV shows
         tv_found = 0
         try:
             for item in self.client.discover_tv(
                 with_watch_providers=provider_id_str,
-                date_gte=date_gte,
-                date_lte=date_lte,
+                date_gte=discover_gte,
+                date_lte=discover_lte,
             ):
                 tv_found += 1
                 release = self._process_item(item, "tv", seen_combinations, window)
